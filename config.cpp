@@ -15,8 +15,8 @@ using std::cerr;
 
 bool	to_line_exp(string& line)
 {
-	line.erase(0, line.find_first_not_of(" \t\n\r"));
-    line.erase(line.find_last_not_of(" \t\n\r") + 1);
+	// line.erase(0, line.find_first_not_of(" \t\n\r"));
+    line.erase(line.find_last_not_of(" \t\r") + 1);
 
 	if (line.find_last_of("#") != string::npos)
    		line.erase(line.find_last_of("#"));
@@ -63,6 +63,7 @@ std::vector<Server> Config::get_servers(std::string file_name)
 	std::string		expression;
 	std::string		tocken;
 	TYPES 			type;
+	int 			blok = 0;
 	// int				
 
 
@@ -72,17 +73,27 @@ std::vector<Server> Config::get_servers(std::string file_name)
 
 		to_line_exp( line );
 		if (!line.empty())
-		{
-			// if (line.  '}' || *line.end() == ';')
-			// 	line.push_back(' ');
-			cout << line << endl;
-			// expression += line;
-		}
-
+			expression += line;
+		// cout << line << endl;
 	}
-	// cout << expression << endl;
+
+	std::stringstream sexp(expression);
+
+	sexp >> line;
+	// cout << sexp << endl;line
+	if (line == "server")
+	{
+		sexp >> line;
+		if (line == "{") blok++;
+		else goto fail;
+
+		// get_deafults();// getting the global defaults in a server
+		// while loop and getting the locations 
+		
+	}
 	exit(0);
-	// fail:
-	// 	std::cerr << "Error : invalid config file" << std::endl;
-	// 	std::exit(1);
+	// cout << expression << endl;
+	fail:
+		std::cerr << "Error : invalid config file" << std::endl;
+		std::exit(1);
 }
