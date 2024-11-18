@@ -1,0 +1,76 @@
+#include <iostream>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <cstring>
+
+// Function to set up a client socket and connect to the server
+int create_client_socket(const char* host, int port) {
+    int client_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (client_socket < 0) {
+        perror("Client socket creation failed");
+        return -1;
+    }
+
+    sockaddr_in server_addr;
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+
+    if (inet_pton(AF_INET, host, &server_addr.sin_addr) <= 0) {
+        perror("Invalid address");
+        close(client_socket);
+        return -1;
+    }
+
+    if (connect(client_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Connection to server failed");
+        close(client_socket);
+        return -1;
+    }
+
+    return client_socket;
+}
+
+void test_non_blocking_server(const char* server_host, int server_port) {
+    std::cout << "Starting test for non-blocking server...\n";
+
+    // Create a client socket
+    int client_socket = create_client_socket(server_host, server_port);
+    if (client_socket < 0) {
+        std::cerr << "Client setup failed. Exiting test.\n";
+        return;
+    }
+
+    // Send a basic request
+    const char* test_request = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
+    ssize_t bytes_sent = send(client_socket, test_request, strlen(test_request), 0);
+    if (bytes_sent < 0) {
+        perror("Error sending data to server");
+        close(client_socket);
+        return;
+    }
+    std::cout << "Test request sent to server.\n";
+
+    // Receive a response from the server
+    char buffer[1024] = {0};
+    ssize_t bytes_received = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
+
+    if (bytes_received < 0) {
+        perror("Error receiving data from server");
+    } else {
+        std::cout << "Response from server:\n" << buffer << "\n";
+    }
+
+    // Close the client socket
+    close(client_socket);
+    std::cout << "Test completed.\n";
+}
+
+int main() {
+    const char* server_host = "127.0.0.1"; // Localhost
+    int server_port = 8080;               // Port your server is listening on
+
+    test_non_blocking_server(server_host, server_port);
+    return 0;
+}
