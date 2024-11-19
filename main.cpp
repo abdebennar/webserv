@@ -71,7 +71,10 @@ using namespace std;
 
 int	main(/*int argc, char **argv*/)
 {
+	Server::defaults.insert(std::make_pair<string, string>("listen", "undefined"));
 	std::string		filename("./test.conf");
 	// Config::init(filename);
 	Config::get_servers(filename);
+
+
 }
