@@ -69,9 +69,12 @@ using namespace std;
 // std::string Config::file_name = "fefault";
 
 
+std::map<std::string, loc_details> Server::location;
+
 int	main(/*int argc, char **argv*/)
 {
 	Server::defaults.insert(std::make_pair<string, string>("listen", "undefined"));
+	// Server::location.insert(std::make_pair<string , loc_details>("test", loc_details()));
 	std::string		filename("./test.conf");
 	// Config::init(filename);
 	Config::get_servers(filename);

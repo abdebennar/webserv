@@ -47,84 +47,119 @@ std::vector<string> split_paths(string &line)
 	return paths;
 }
 
+bool	is_defaults(std::string key)
+{
+	return (key == "listen" || key == "server_name" || key == "host" ||
+			key == "root" || key == "client_max_body_size" || key == "index" || key == "error_page");
+}
+
+bool	is_location(std::string key)
+{
+	return (key == "allow_methods" || key == "index" 
+	|| key == "autoindex" || key == "root" || key == "return");
+}
+
+void	location_params(loc_details &loc, string &key, string &value)
+{
+	if (key == "allow_methods")
+	{
+		 // TODO check methodes
+
+		 loc.allow_methods = value;
+	}
+	else if (key == "autoindex")
+	{
+		if (value == "on")
+			loc.auto_index = true;
+		else if (value == "off")
+			loc.auto_index = false;
+		// FIXME
+	}
+	else if (key == "root")
+	{
+		loc.root = value;
+		// else throw "Root is  invalid\n"; // FIXME
+	}
+	else if (key == "index")
+	{
+		loc.index_path = value;
+		// FIXME 
+	}
+	else 
+		assert(false && "unimplemented yet ");
+}
+
 void get_defaults(std::istringstream &exp)
 {
 	std::string line;
-	std::string value;
-	std::string key;
-	string path;
+	// std::string value;
+	std::string	key;
+	string		path;
+	loc_details	loc = {0};
 
-	while (exp >> line)
+
+	while (std::getline(exp, line , '\n'))
 	{
-		if (line == "listen" || line == "server_name" || line == "host" ||
-			line == "root" || line == "client_max_body_size" || line == "index" || line == "error_page")
-		{
-			key = line;
-			value.clear();
-			while (exp >> line)
-			{
-				value += line + " ";
-				if (line.back() == ';')
-				{
-					value.pop_back();
-					break;
-				}
-			}
+		std::istringstream sline(line);
 
-			if (value.empty() || value.back() != ';')
-				throw std::runtime_error("Invalid format: missing semicolon at the end.");
+		sline >> key;
+		if (is_defaults(key))
+		{ 
+			if (line.back() != ';')
+				throw (std::runtime_error("Error: expected `;' end of expression"));
 
-			if (value.back() == ';')
-				value.pop_back();
-			Server::defaults[key] = value;
+			std::getline( sline , line );
+			line.erase(line.find_last_not_of(";") + 1);
+			Server::defaults[key] = line;
+			key.clear();
+			// sline.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 		}
-		else if (line == "location")
+
+		else if (key == "location")
 		{
-			exp >> std::ws;
-			while (exp >> line)
+			std::getline( sline , line );
+			size_t pos = line.find_last_not_of(" \n\r\t") ;
+			if (pos != string::npos)
 			{
-				if (line == "{")
-					break;
-
-				path += line;
-				split_paths(line);
+				if (line[pos] != '{')
+					throw (std::runtime_error("Error: expected `{' after location path"));
+				line.erase(line.find('{'));
 			}
-			if (line != "{")
-				throw std::runtime_error("Invalid format: expacted `{' after location defenetion");
-			line.clear();
+			std::vector<string> paths = split_paths( line );
 
-			exp >> std::ws;
-			exp >> line;
-			while  (line == "allow_methods" || line == "index" || line == "autoindex" || line == "root" || line == "return")
+			while   (true)
 			{
-				// assert(!"inside location");
-				key = line;
-				value.clear();
-				while (exp >> line)
-				{
-					value += line + " ";
-					if (line.back() == ';')
+				line.clear();
+				// cout << "here" << endl;
+ 				std::getline( exp, line, '\n' );
+				std::istringstream sline(line);
+
+				sline >> key;
+				if (is_location(key))
+				{ 
+					if (line.back() != ';')
 					{
-						value.pop_back();
-						break;
+						throw (std::runtime_error("Error: expected `;' end of expression"));
 					}
+
+					std::getline( sline , line );
+					line.erase(line.find_last_not_of(";") + 1);
+					location_params( loc, key, line );
+					key.clear();
 				}
-
-				if (value.empty() || value.back() != ';')
-					throw std::runtime_error("Invalid format: missing semicolon at the end.");
-
-				if (value.back() == ';')
-					value.pop_back();
-				// Server::defaults[key] = value;
-
-				cout << "key : " << key << " => " << value << endl;
-				exp >> std::ws;
-				exp >> line;
+				else if (key == "}")
+					break;
+			}
+			for (int i = 0; i < paths.size() ; i++)
+			{
+				Server::location[paths[i]] = loc;
 			}
 		}
-		else // one server is done
-			exit (1); // FIXME
+		else
+			continue;
+			// FIXME unexpacted input
 	}
+
 }
 
 std::vector<Server> Config::get_servers(std::string file_name)
@@ -161,12 +196,19 @@ std::vector<Server> Config::get_servers(std::string file_name)
 		get_defaults(sexp);
 	}
 
-	cout << Server::defaults["listen"] << endl;
-	cout << Server::defaults["server_name"] << endl;
-	cout << Server::defaults["host"] << endl;
-	cout << Server::defaults["root"] << endl;
-	cout << Server::defaults["index"] << endl;
-	cout << Server::defaults["error_page"] << endl;
+	// cout << std::setw(10) << "Server defaults " << endl;
+	// cout << Server::defaults["listen"] << endl;
+	// cout << Server::defaults["server_name"] << endl;
+	// cout << Server::defaults["host"] << endl;
+	// cout << Server::defaults["root"] << endl;
+	// cout << Server::defaults["index"] << endl;
+	// cout << Server::defaults["error_page"] << endl;
+	// cout << std::setw(10) << "location daitails" << endl;
+
+	cout << std::boolalpha << Server::location["/"].root << endl;
+	cout << std::boolalpha << Server::location["/user"].root << endl;
+	cout << std::boolalpha << Server::location["/path1"].root << endl;
+
 	exit(0);
 
 fail:

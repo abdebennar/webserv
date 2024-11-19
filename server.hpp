@@ -24,6 +24,7 @@ struct	loc_details
 {
 	// std::string	path;
 	int 		status_code;
+	string 		index_path;
 	std::string	allow_methods;
 	bool		auto_index;
 	bool		has_cgi;
