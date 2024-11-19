@@ -94,9 +94,8 @@ typedef enum
 
 class	Config
 {
-	private :
 	public :
-		// static std::string file_name;
-		// static void	init(std::string);
+		static std::map<string, string>			defaults;
+		static std::map<string, loc_details>	location;
 		static std::vector<Server>	get_servers(std::string filename);
 };

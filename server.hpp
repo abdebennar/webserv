@@ -40,8 +40,6 @@ class	Server
 		int	num_server;
 
 	public :
-		static std::map<string, string>			defaults;
-		static std::map<string, loc_details>	location;
 	
 	
 };

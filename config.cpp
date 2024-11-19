@@ -2,6 +2,9 @@
 #include <sstream>
 #include <map>
 
+std::map<std::string, std::string> Config::defaults;
+std::map<std::string, loc_details> Config::location;
+
 // void	Config::init(std::string conff)
 // {
 // 	file_name = conff;
@@ -110,7 +113,7 @@ void get_defaults(std::istringstream &exp)
 
 			std::getline( sline , line );
 			line.erase(line.find_last_not_of(";") + 1);
-			Server::defaults[key] = line;
+			Config::defaults[key] = line;
 			key.clear();
 			// sline.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 		}
@@ -152,7 +155,7 @@ void get_defaults(std::istringstream &exp)
 			}
 			for (int i = 0; i < paths.size() ; i++)
 			{
-				Server::location[paths[i]] = loc;
+				Config::location[paths[i]] = loc;
 			}
 		}
 		else
@@ -196,18 +199,18 @@ std::vector<Server> Config::get_servers(std::string file_name)
 		get_defaults(sexp);
 	}
 
-	// cout << std::setw(10) << "Server defaults " << endl;
-	// cout << Server::defaults["listen"] << endl;
-	// cout << Server::defaults["server_name"] << endl;
-	// cout << Server::defaults["host"] << endl;
-	// cout << Server::defaults["root"] << endl;
-	// cout << Server::defaults["index"] << endl;
-	// cout << Server::defaults["error_page"] << endl;
+	// cout << std::setw(10) << "Config defaults " << endl;
+	// cout << Config::defaults["listen"] << endl;
+	// cout << Config::defaults["Config_name"] << endl;
+	// cout << Config::defaults["host"] << endl;
+	// cout << Config::defaults["root"] << endl;
+	// cout << Config::defaults["index"] << endl;
+	// cout << Config::defaults["error_page"] << endl;
 	// cout << std::setw(10) << "location daitails" << endl;
 
-	cout << std::boolalpha << Server::location["/"].root << endl;
-	cout << std::boolalpha << Server::location["/user"].root << endl;
-	cout << std::boolalpha << Server::location["/path1"].root << endl;
+	cout << std::boolalpha << Config::location["/"].root << endl;
+	cout << std::boolalpha << Config::location["/user"].root << endl;
+	cout << std::boolalpha << Config::location["/path1"].root << endl;
 
 	exit(0);
 
