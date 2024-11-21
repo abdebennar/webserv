@@ -14,7 +14,7 @@
 #include <fstream>
 
 
-const char* http_response =
+const char http_response[] =
     "HTTP/1.1 200 OK\n"
     "Accept-Ranges: bytes\r\n"
     "Age: 294510\r\n"
@@ -26,7 +26,7 @@ const char* http_response =
     "Last-Modified: Thu, 17 Oct 2019 07:18:26 GMT\r\n"
     "Server: ECAcc (nyd/D10E)\r\n"
     "X-Cache: HIT\r\n"
-    "Content-Length: 1256\r\n"
+    "Content-Length: [body-lenght] \r\n"
     "\r\n"
     "<!doctype html>\n"
     "<html lang=\"en\">\n"
@@ -53,6 +53,15 @@ const char* http_response =
     "</body>\n"
     "</html>";
 
+// const char *response_404 = "HTTP/1.1 404 Not Found\r\n"
+// "Content-Type: text/html; charset=UTF-8\r\n"
+// "Cache-Control: no-cache, no-store, must-revalidate\r\n"
+// "Date: Fri, 21 Nov 2024 14:18:33 GMT\r\n"
+// "Expires: 0\r\n"
+// "Server: CustomServer/1.0\r\n"
+// "Content-Length: [body length]\r\n";
+
+
 int main2()
 {
 	int fd = open("response.txt", O_RDWR);
@@ -68,6 +77,9 @@ int main()
 	int fd = socket(AF_INET, SOCK_STREAM, 0);
 	assert(fd >= 0 && " ERROR: can't open a socket\n");
 
+	int flags = fcntl(fd, F_GETFL, 0);
+	fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+
 	struct sockaddr_in socketaddr;
 
 	bzero(&socketaddr, sizeof(sockaddr_in));
@@ -78,28 +90,33 @@ int main()
 	if (ret < 0)
 		perror(""), errno = 0;
 
-	ret = listen(fd, 0);
+
+	ret = listen(fd, 8);
 	assert(ret >= 0 && " ERROR: can't listen \n");
 
 	struct sockaddr client_data = {0};
 	socklen_t client_d_len = 0;
 
-	int cfd = accept(fd, &client_data, &client_d_len);
-	if (cfd < 0)
-		perror ("accept	:"), errno = 0;
+
 	std::string line;
 	char in[1024];
 
-	struct pollfd pfd;
+	// flags = fcntl(cfd, F_GETFL, 0);
+	// fcntl(cfd, F_SETFL, flags | O_NONBLOCK);
 
-	int flags = fcntl(cfd, F_GETFL, 0);
-	fcntl(cfd, F_SETFL, flags | O_NONBLOCK);
-	pfd.events = POLLOUT | POLLIN;
-	pfd.fd = cfd;
+	
+
+	
 
 	while (true)
 	{
-		if (poll(&pfd, 1, 2000) == 1)
+		struct pollfd pfd = {0};
+		int cfd = accept(fd, &client_data, &client_d_len);
+		if (cfd > 0)
+			std::cout << "new connection" << std::endl;
+		pfd.events =  POLLIN;
+		pfd.fd = cfd;
+		if (poll(&pfd, 1, 1000) == 1)
 		{
 			if (pfd.revents & POLLIN)
 			{
@@ -114,21 +131,9 @@ int main()
 					else
 						break;
 				}
-				std::cout << " breaked " << std::endl;
-				std::ifstream file("response.txt");
-				if (file.fail())
-					perror("file");
-					
-					// while (std::getline(file, line))
-					// {
-					// 	int w = write(cfd, line.c_str(), line.size());
-					// 	std::cout << line << std::endl;
-					// 	if (w < 0)
-					// 		break;
-					// }
-						int w = write(cfd, http_response, strlen(http_response));
-						std::cout << http_response << std::endl;
-					std::cout << w << " of bytes writed in socket fd" << std::endl;
+				int w = write(cfd, http_response, 950);
+				std::cout << http_response << std::endl;
+				std::cout << w << " of bytes writed in socket fd" << std::endl;
 
 				std::cout << " Done writing !! " << std::endl;
 				close(cfd);
