@@ -40,6 +40,6 @@ class	Server
 		int	num_server;
 
 	public :
-	
+		void	setup();
 	
 };

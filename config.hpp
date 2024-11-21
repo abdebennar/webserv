@@ -95,7 +95,11 @@ typedef enum
 class	Config
 {
 	public :
-		static std::map<string, string>			defaults;
-		static std::map<string, loc_details>	location;
-		static std::vector<Server>	get_servers(std::string filename);
+		static std::map<string, string>			defaults; // <==
+		static std::map<string, loc_details>	location;  // <==
+		static std::vector<Server>	get_servers(std::string filename); // TODO every server most have its own def and 
+		// locations  
+
+	public :
+		static int		get_port(){ return atoi(S::defaults["listen"].c_str()); }
 };

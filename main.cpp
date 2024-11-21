@@ -78,7 +78,7 @@ int	main(/*int argc, char **argv*/)
 		std::string		filename("./test.conf");
 		Config::get_servers(filename);
 		// Server::setup();
-		// Server::run();
+		// Server::listen();
 	// }
 
 
