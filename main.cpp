@@ -14,116 +14,138 @@
 
 using namespace std;
 
-// int main()
-// {
-// 	int fd = socket(AF_INET, SOCK_STREAM, 0);
-// 	assert(fd >= 0 && " ERROR: can't open a socket\n");
-
-// 	struct sockaddr_in socketaddr;
-
-// 	bzero(&socketaddr, sizeof(sockaddr_in));
-// 	socketaddr.sin_family = AF_INET;
-// 	socketaddr.sin_port = htons(8080);
-
-// 	int ret = bind(fd , (const struct sockaddr *) &socketaddr, sizeof(socketaddr));
-// 	if (ret < 0)	perror("");
-
-// 	 ret = listen(fd, 0);
-// 	assert(ret >= 0 && " ERROR: can't listen \n");
-
-// 	struct sockaddr client_data = {0};
-// 	socklen_t client_d_len = 0;
-
-// 	listen:
-// 		int cfd = accept(fd, &client_data, &client_d_len);
-// 		char line[100];
-
-// 		struct pollfd pfd;
-
-// 		pfd.events = POLLIN;
-// 		pfd.fd = cfd;
 
 
-// 	while  (true)
-// 	{
-// 		if (poll(&pfd, 1, 1000) == 1)
-// 		{
-// 			if (pfd.revents & POLLIN)
-// 			{
-// 				read(cfd, line, 98);
-// 				line[99] = 0;
-// 				std::cout << line;
-// 				bzero(line, 100);
-// 			}
-// 		}
-// 		else
-// 			goto listen;
-// 	}
+
+#define NO_EVENT 0
 
 
-	
-
-// 	close(cfd);
-// 	close(fd);
-
-// }
-
-// std::string Config::file_name = "fefault";
+std::vector<struct pollfd> fds;
 
 
-// std::map<std::string, loc_details> Server::location;
-
-std::deque<struct pollds>	fds;
-
-void	init(std::vector<Config> servers)
+int is_server(vector<Config> servers, int index)
 {
 	for (int i = 0; i < servers.size(); i++)
 	{
-		PORT	port = atoi(servers[i].defaults["listen"].c_str());
-		// BUG  the address should be trimed from any space
-		// cout <<  "host : \'" << servers[i].defaults["host"].c_str() << "'" << endl;
-		ip_addr	ip	= inet_addr(servers[i].defaults["host"].c_str() + 1);
-		if (ip == -1)
-			perror ("83"), exit(errno);
+		if (fds[index].fd == servers[i].get_socket())
+			return (i);
+	}
+	return 0;
+}
 
-		int sfd = socket(AF_INET, SOCK_STREAM, 0);
-		if (sfd < 0)
-			perror ("87"), exit(errno);
+void	init(std::vector<Config> servers)
+{
 
-		int flags = fcntl(sfd, F_GETFL, 0);
-		fcntl(sfd, F_SETFL, flags | O_NONBLOCK);
+	for (int i = 0; i < servers.size(); i++)
+	{
+		struct pollfd tmp = {0};
+		// struct sockaddr_in address = {0};
 		
-		struct sockaddr_in address = {0};
+		servers[i].set_socket(socket(AF_INET, SOCK_STREAM, 0));
 
-		address.sin_family = AF_INET;
-		address.sin_port = htons(port);
-		address.sin_addr.s_addr = ip;
-		socklen_t	len = sizeof(address);
+		int flags = fcntl(servers[i].get_socket(), F_GETFL, 0);
+		flags = fcntl(servers[i].get_socket(), F_SETFL, flags | O_NONBLOCK);
+		
+		if (flags == -1)
+			perror ("faild to fcntl()");
 
-		int bret = bind(sfd, (const struct sockaddr *)&address, len );
+		servers[i].address.sin_family = AF_INET;
+		servers[i].address.sin_port = htons(servers[i].get_port());
+		servers[i].address.sin_addr.s_addr = servers[i].get_host();
+
+		int bret = bind(servers[i].get_socket(), servers[i].get_address(), servers[i].get_socklen());
 		if (bret < 0)
 			perror ("87"), exit(errno);
 
-		int lsn = listen(sfd, 5);
-		// if
+		int lsn = listen(servers[i].get_socket(), 5);
+		if (lsn < 0)
+			perror ("faild to listen()");
 
-		cout << setw(10) << "Server informations" << endl;
-		cout << endl;
-		cout << "Server name\t:" <<  servers[i].defaults["server_name"] << endl;
-		cout << "Port\t\t: " << port	<< endl;
-		cout << "Host\t\t: " << servers[i].defaults["host"] << endl;
-		cout << endl;
+		tmp.fd = servers[i].get_socket();
+		tmp.events = POLLIN;
+		tmp.revents = 0;
 
-		while (true)
-		{
-			// TODO accept all connection 
-
-			// add the conections to the poll fds 
-			// remove the closed connections from the poll fds 
-		}
+		fds.push_back(tmp);
 
 	}
-	cout << "ALL servers created secsesfully" << endl;
+	
+		clog << "ALL servers created secsesfully" << endl;
+
+		cout << "sizeof pollfd is : " << fds.size() << endl;
+
+	while (true)
+	{
+		struct pollfd *tmp = fds.data();
+		int p_ret = poll( tmp, fds.size(), 1000);
+		if (p_ret == -1)
+			perror ("faild to poll()");
+		else if (p_ret == 0)
+			continue;
+		else
+		{
+			for (int i = 0 ;i < fds.size(); i++)
+			{
+				// check the fd if is server so POLLIN means new connection
+				// else the client iswaiting for response 
+				if (fds[i].revents == 0)
+					continue;
+				int srv = is_server(servers, i);
+				if (srv)
+				{
+					if (fds[srv].revents & POLLIN)
+						servers[srv].accept_connections(fds);
+				}
+				if (fds[i].revents & POLLIN)
+				{
+					// recv(fds[i].fd, req, 8192, 0);
+
+					cout <<  "event frome: " << fds[i].fd << endl;
+
+					char req[8192];
+					int r = read(fds[i].fd, req, sizeof(req) - 1); // Limit to buffer size minus 1
+					if (r > 0) {
+						req[r] = '\0'; // Null-terminate the string
+						cout << req << endl;
+					} else if (r == 0) {
+						// Handle EOF (peer closed the connection)
+						cout << "Connection closed by peer." << endl;
+					} else {
+						// Handle error case
+						perror("read failed");
+}
+
+
+				}
+				// else if (fds[i].ev)
+				// {
+				// 	servers[i].send_response(i);
+				// }
+
+
+				// if (fds[i].fd == sfd) 
+				// {
+				// 	cout << "in socket accept" << endl;
+				// 	// int newfd = accept(sfd, (struct sockaddr*)&address, &len);
+				// 	if (newfd < 0)
+				// 		perror ("faild to accept()");
+				// 	// recv(newfd, (void*)http_response, strlen(http_response),0);
+				// 	int flags = fcntl(newfd, F_GETFL, 0);
+				// 	fcntl(newfd, F_SETFL, flags | O_NONBLOCK);
+				// 	fds.push_back({newfd, POLLIN,0});
+				// }
+				// if (fds[i].revents == POLLIN)
+				// {
+				// 	cout << "writing data" << endl;
+				// 	send(fds[fds.size() - 1 ].fd, (void*)http_response, strlen(http_response), 0);
+				// 	cout << "done writing" << std::endl;
+				// }					
+			}
+		}
+
+
+	// // 		// add the conections to the poll fds 
+	// // 		// remove the closed connections from the poll fds 
+	}
 }
 
 // void	run(Server)
@@ -138,10 +160,21 @@ int	main(/*int argc, char **argv*/)
 	// {
 		std::vector<Config>	servers;
 		std::string		filename("./test.conf");
-		servers = Parse::get_servers(filename);
+
+		Config	server1;
+		Config	server2;
+		server1.defaults["listen"] = "9090";
+		server2.defaults["listen"] = "9099";
+		server1.defaults["host"] 	= "127.0.0.1";
+		server2.defaults["host"] 	= "127.0.0.1";
+
+		servers.push_back(server1);
+		servers.push_back(server2);
+ 
+		// servers = Parse::get_servers(filename);
 
 		init(servers);
-		run();
+		// run();
 
 		// Server::init(); // check all the servers  are valid, check ip addresses
 		// , ports , duplication , and creat sockets and bind them , open ports ...

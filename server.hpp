@@ -55,7 +55,6 @@ typedef	in_addr_t	ip_addr;
 
 struct	loc_details
 {
-	// std::string	path;
 	int 		status_code;
 	string 		index_path;
 	std::string	allow_methods;

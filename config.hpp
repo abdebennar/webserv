@@ -98,8 +98,47 @@ struct	loc_details;
 
 class	Config
 {
+    
 	public :
         std::map<string, string>		defaults;
 		std::map<string, loc_details>	location;
-        
+        int                             socket_fd;
+		struct sockaddr_in 				address;
+		socklen_t						socket_len;
+
+    public :
+		Config() { address = {0}; socket_len = sizeof(address); };
+        int get_port() {
+                return atoi(this->defaults["listen"].c_str()); };
+        int get_host() {
+                return inet_addr(this->defaults["host"].c_str());
+        }
+
+        void set_socket(int fd) {
+            this->socket_fd = fd ;
+        }
+        int get_socket() {
+            // TODO add protections of invalid fd;
+            return (this->socket_fd);
+        }
+
+		socklen_t get_socklen() { 
+			return (this->socket_len);
+		}
+
+		socklen_t *get_socklenp() { 
+			return (&socket_len);
+		}
+
+		const struct sockaddr* get_address()
+		{
+			return ((const struct sockaddr *)&this->address);
+		}
+		struct sockaddr* get_address(int)
+		{
+			return ((struct sockaddr *)&this->address);
+		}
+
+        void	accept_connections(std::vector<struct pollfd> fds);
+		void	send_response(int index);
 };
