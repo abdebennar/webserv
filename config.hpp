@@ -69,6 +69,7 @@ http {
 #include <vector>
 #include <fstream>
 #include <iostream>
+#include "clients.hpp"
 
 using std::string;
 using std::cout;
@@ -85,6 +86,45 @@ enum GlobalDir
 };
 
 
+const char http_response[] =
+    "HTTP/1.1 200 OK\n"
+    "Accept-Ranges: bytes\r\n"
+    "Age: 294510\r\n"
+    "Cache-Control: max-age=604800\r\n"
+    "Content-Type: text/html; charset=UTF-8\r\n"
+    "Date: Fri, 21 Jun 2024 14:18:33 GMT\r\n"
+    "Etag: \"3147526947\"\r\n"
+    "Expires: Fri, 28 Jun 2024 14:18:33 GMT\r\n"
+    "Last-Modified: Thu, 17 Oct 2019 07:18:26 GMT\r\n"
+    "Server: ECAcc (nyd/D10E)\r\n"
+	"connection: close\r\n"
+    "X-Cache: HIT\r\n"
+    "Content-Length: [body-lenght] \r\n"
+    "\r\n"
+    "<!doctype html>\n"
+    "<html lang=\"en\">\n"
+    "<head>\n"
+    "    <meta charset=\"UTF-8\">\n"
+    "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+    "    <meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">\n"
+    "    <title>Server Test - It's Working</title>\n"
+    "    <style>\n"
+    "        body {\n"
+    "            font-family: Arial, sans-serif;\n"
+    "            text-align: center;\n"
+    "            margin-top: 50px;\n"
+    "        }\n"
+    "        .message {\n"
+    "            font-size: 2em;\n"
+    "            color: #4CAF50;\n"
+    "        }\n"
+    "    </style>\n"
+    "</head>\n"
+    "<body>\n"
+    "    <div class=\"message\">Nta Zamel!</div>\n"
+    "</body>\n"
+    "</html>";
+
 typedef enum
 {
 	SERVER = 1,
@@ -95,50 +135,57 @@ typedef enum
 
 struct	loc_details;
 
+typedef std::map<string, string>::iterator default_iter;
+typedef std::map< string, std::map<string, string> >::iterator locations_iter;
+
 
 class	Config
 {
     
 	public :
-        std::map<string, string>		defaults;
-		std::map<string, loc_details>	location;
-        int                             socket_fd;
-		struct sockaddr_in 				address;
-		socklen_t						socket_len;
+		// static struct pollfd 			fds[1000];
+		static int													numfds;
+        std::map<string, string>										defaults;
+		std::map< string, std::map<string, string> >					location;
+		// struct sockaddr_in 				address;
+        // int                             socket_fd;
+		// socklen_t						socket_len;
 
-    public :
-		Config() { address = {0}; socket_len = sizeof(address); };
-        int get_port() {
-                return atoi(this->defaults["listen"].c_str()); };
-        int get_host() {
-                return inet_addr(this->defaults["host"].c_str());
-        }
+    // public :
+		// Config() { address = {0}; socket_len = sizeof(address);};
+        // int get_port() {
+        //         return atoi(this->defaults["listen"].c_str()); };
+        // int get_host() {
+        //         return inet_addr(this->defaults["host"].c_str());
+        // }
 
-        void set_socket(int fd) {
-            this->socket_fd = fd ;
-        }
-        int get_socket() {
-            // TODO add protections of invalid fd;
-            return (this->socket_fd);
-        }
+        // void set_socket(int fd) {
+		// 	if (fd < 0)
+		// 		perror ("set_socket faild : Invalid fd");
+        //     this->socket_fd = fd ;
+        // }
+        // int get_socket() {
+        //     // TODO add protections of invalid fd;
+        //     return (this->socket_fd);
+        // }
 
-		socklen_t get_socklen() { 
-			return (this->socket_len);
-		}
+		// socklen_t get_socklen() { 
+		// 	return (this->socket_len);
+		// }
 
-		socklen_t *get_socklenp() { 
-			return (&socket_len);
-		}
+		// socklen_t *get_socklenp() { 
+		// 	return (&socket_len);
+		// }
 
-		const struct sockaddr* get_address()
-		{
-			return ((const struct sockaddr *)&this->address);
-		}
-		struct sockaddr* get_address(int)
-		{
-			return ((struct sockaddr *)&this->address);
-		}
+		// const struct sockaddr* get_address()
+		// {
+		// 	return ((const struct sockaddr *)&this->address);
+		// }
+		// struct sockaddr* get_address(int)
+		// {
+		// 	return ((struct sockaddr *)&this->address);
+		// }
 
-        void	accept_connections(std::vector<struct pollfd> fds);
-		void	send_response(int index);
+        // void	accept_connections();
+		// void	send_response(int index);
 };

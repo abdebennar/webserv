@@ -1,191 +1,349 @@
 
 
 #include "parse.hpp"
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <map>
+#include <vector>
+#include <arpa/inet.h>
 
-std::vector<string> split_paths(string &line)
-{
-	std::istringstream sline(line);
-	std::vector<string> paths;
-	string path;
 
-	while (sline >> path)
-		paths.push_back(path);
 
-	return paths;
+std::string trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t");
+    size_t end = str.find_last_not_of(" \t");
+    return (start == std::string::npos) ? "" : str.substr(start, end - start + 1);
 }
 
-bool	is_defaults(std::string key)
+// Function to check if a line starts with "server" and is valid
+bool is_server(const std::string& line)
 {
-	return (key == "listen" || key == "server_name" || key == "host" ||
-			key == "root" || key == "client_max_body_size" || key == "index" || key == "error_page");
+    std::string trimmed = trim(line);
+
+    if (trimmed.find("server") != 0)
+        return false;
+
+    std::string rem = trimmed.substr(6);
+    rem = trim(rem);
+
+    if (rem.empty() || (rem == "{"))
+        return true;
+
+    return false;
 }
 
-bool	is_location(std::string key)
-{
-	return (key == "allow_methods" || key == "index" 
-	|| key == "autoindex" || key == "root" || key == "return");
+// Function to check if a line starts with "location" and ends with "{"
+bool is_location(const std::string& line, string &path) {
+    size_t pos = line.find("location");
+    if (pos != std::string::npos) 
+	{
+        size_t openBracket = line.find("{", pos);
+        path = line.substr(pos + 8, openBracket - (pos + 8));
+        path.erase(0, path.find_first_not_of(" \t"));
+        path.erase(path.find_last_not_of(" \t") + 1);
+        return (!path.empty() && openBracket == line.length() - 1);
+    }
+    return false;
 }
 
-void to_line_exp(string &line)
-{
-	line.erase(0, line.find_first_not_of(" \t\r"));
-	line.erase(line.find_last_not_of(" \t\r") + 1);
-
-	if (string::npos && line.find(';') != line.find_last_of(';'))
-		line.insert(line.find(';') + 1, "\n");
-	if (line.find_last_of("#") != string::npos)
-		line.erase(line.find_last_of("#"));
+std::vector<std::string> split(const std::string& str, char delimiter = ' ') {
+    std::vector<std::string> tokens;
+    std::istringstream stream(str);
+    std::string token;
+    while (std::getline(stream, token, delimiter)) {
+        token.erase(0, token.find_first_not_of(" \t"));
+        token.erase(token.find_last_not_of(" \t") + 1);
+        if (!token.empty()) {
+            tokens.push_back(token);
+        }
+    }
+    return tokens;
 }
 
-void	location_params(loc_details &loc, string &key, string &value)
+void	check_syntax(std::map<string, string>::iterator iter, Server &server)
 {
+	string key = iter->first;
+	string value = iter->second;
+
+	if (key == "listen")
+	{
+		int port;
+		if (!for_each(value.begin(), value.end(), ::isdigit))
+			throw runtime_error("invalid port");
+		else
+			port = atoi(value.c_str());
+		if (port > 65535 || port < 0)
+			throw runtime_error("port richded limit");
+		server.port = port;
+	}
+	else if (key == "host")
+	{
+		in_addr_t host;
+		host = inet_addr(value.c_str());
+		if (host == -1)
+			throw runtime_error("invalid host");
+		server.host = host;
+	}
+
+	else if (key == "index")
+	{
+		if (value.empty())
+			throw runtime_error("index can't be empty");
+		else
+			server.index = value;
+	}
+	else if (key == "error_page")
+	{
+		int code ;
+		string page;
+		std::vector<string> pages = split(value, ',');
+		for (int i = 0; i < pages.size(); i++)
+		{
+			std::istringstream stream(pages[i]);
+			if (!(stream >> code >> page))
+				throw runtime_error("syntax error for `error_page'");
+			server.error_pages[code] = page;
+		}
+	}
+	else if (key == "server_name")
+	{
+		server.server_name = value;
+	}
+}
+
+
+void	set_location_data(map<string, string>::iterator loc, loc_details &dest)
+{
+	string key = loc->first;
+	string value = loc->second;
 	if (key == "allow_methods")
 	{
-		 // TODO check methodes
-
-		 loc.allow_methods = value;
+		 dest.allow_methods = value;
 	}
 	else if (key == "autoindex")
 	{
 		if (value == "on")
-			loc.auto_index = true;
+			dest.auto_index = true;
 		else if (value == "off")
-			loc.auto_index = false;
-		// FIXME
+			dest.auto_index = false;
+		else
+			throw runtime_error ("invalid format for autoindex");
 	}
 	else if (key == "root")
 	{
-		loc.root = value;
-		// else throw "Root is  invalid\n"; // FIXME
+		dest.root = value;
+		// else throw "Root is  invalid\n"; //TODO
 	}
 	else if (key == "index")
 	{
-		loc.index_path = value;
-		// FIXME 
+		dest.index_path = value;
+		// TODO
 	}
-	else 
-		assert(false && "unimplemented yet ");
+	else if (key == "return")
+	{
+		dest.return_path = value;
+	}
 }
 
-
-void get_defaults(std::istringstream &exp, Config &conf)
+std::vector<Server> Parse::config2server(std::vector<Config> configs)
 {
-	std::string line;
-	// std::string value;
-	std::string	key;
-	string		path;
-	loc_details	loc = {0};
+	std::vector<Server> servers;
+	loc_details	tmp = {0};
 
-
-	while (std::getline(exp, line , '\n'))
+	try 
 	{
-		std::istringstream sline(line);
+		// reserve size for number of servers
+		servers.reserve(configs.size());
 
-		sline >> key;
-		if (is_defaults(key))
-		{ 
-			if (line.back() != ';')
-				throw (std::runtime_error("Error: expected `;' end of expression"));
-
-			std::getline( sline , line );
-			line.erase(line.find_last_not_of(";") + 1);
-			conf.defaults[key] = line;
-			key.clear();
-			// sline.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-		}
-
-		else if (key == "location")
+		// loop over all configs and check syntax and parameters
+		for (std::vector<Config>::iterator it = configs.begin(); it != configs.end(); it++)
 		{
-			std::getline( sline , line );
-			size_t pos = line.find_last_not_of(" \n\r\t") ;
-			if (pos != string::npos)
-			{
-				if (line[pos] != '{')
-					throw (std::runtime_error("Error: expected `{' after location path"));
-				line.erase(line.find('{'));
-			}
-			std::vector<string> paths = split_paths( line );
-
-			while   (true)
-			{
-				line.clear();
-				// cout << "here" << endl;
- 				std::getline( exp, line, '\n' );
-				std::istringstream sline(line);
-
-				sline >> key;
-				if (is_location(key))
-				{ 
-					if (line.back() != ';')
-					{
-						throw (std::runtime_error("Error: expected `;' end of expression"));
-					}
-
-					std::getline( sline , line );
-					line.erase(line.find_last_not_of(";") + 1);
-					location_params( loc, key, line );
-					key.clear();
+			 Server cur_server;
+			 // iterate over all all defaults in one server
+			 for (std::map<std::string, std::string>::iterator iter = it->defaults.begin();
+			 	iter != it->defaults.end(); ++iter)
+				{
+					check_syntax(iter, cur_server);
 				}
-				else if (key == "}")
-					break;
-			}
-			for (int i = 0; i < paths.size() ; i++)
-			{
-				conf.location[paths[i]] = loc;
-			}
+			 for (std::map< string, std::map<string, string> >::iterator iter = it->location.begin();
+			 	iter != it->location.end(); ++iter)
+				{
+					// cout << "\tLocation : "  << iter->first << endl;
+					for (std::map<string, string>::iterator keys_iterator = iter->second.begin();
+							keys_iterator != iter->second.end() ; keys_iterator++)
+							{
+								// cout << "key : " << keys_iterator->first << "  data : " << keys_iterator->second << endl;
+								set_location_data(keys_iterator, tmp);
+								// set_location_data()
+							}
+					std::vector<string> paths = split(iter->first, ' ');
+					for (int i = 0; i < paths.size(); i++)
+					{
+						cur_server.locations[paths[i]] = tmp;
+					}
+				}
+				servers.push_back(cur_server);
 		}
+	}
+	catch (std::exception &e)
+	{
+		cout << e.what() << endl;
+		exit(1);
+	}
+	return servers;
+}
+
+// HACK remove this
+std::string hostToString(in_addr_t host) {
+    struct in_addr addr;
+    addr.s_addr = host;
+    return inet_ntoa(addr);
+}
+
+std::vector<Server> &Parse::get_servers(std::string file_name)
+{
+	std::vector<Config> configs;
+	Config				cur_config;
+	wbs_ifstream configFile(file_name);
+	string		cur_path;
+
+	bool inServer = false;
+    bool inLocation = false;
+
+	int serverBracketCount = 0; 
+    int locationBracketCount = 0; 
+
+	  std::vector<std::map<std::string, std::string> > servers;
+		std::map<std::string, std::string> currentServer;
+
+try{
+   		 if (!configFile.is_open())
+			throw runtime_error("Unable to open config file");
+
+		 std::string line;
+    while (std::getline(configFile, line))
+	{
+        line = trim(line);
+	
+        if (line.empty() || line[0] == '#') continue;
+
+		// xx :Check for server block
+        if (is_server(line)) 
+		{
+            if (inServer)
+				throw runtime_error("Syntax Error: Nested server blocks are not allowed.");
+            inServer = true;
+
+            // Check {
+            if (line.find("{") != std::string::npos)
+                ++serverBracketCount;
+			else 
+			{
+                // Expect {
+                std::getline(configFile, line);
+                line = trim(line);
+                if (line != "{")
+					throw runtime_error("Syntax Error: Missing '{' after server declaration.");
+                ++serverBracketCount;
+            }
+            continue;
+        }
+		// end xx
+
+
+		// vv Check for location block
+        if (is_location(line, cur_path))
+		{
+			// cout << "LOCATION FOUND" << "in path: " << cur_path << endl;
+            if (!inServer)
+				throw runtime_error("Syntax Error: Location block outside of server block.");
+            inLocation = true;
+            ++locationBracketCount;
+            continue;
+        }
+		// end vv
+
+        // bb Handle closing brackets
+        if (line == "}")
+		{
+            if (inLocation) 
+			{
+                --locationBracketCount;
+                if (locationBracketCount == 0)
+                    inLocation = false;
+            }
+			else if (inServer) 
+			{
+                --serverBracketCount;
+                if (serverBracketCount == 0)
+				{
+                    inServer = false; 
+                    configs.push_back(cur_config); 
+                    currentServer.clear();
+                }
+            }
+			else 
+                throw runtime_error("Syntax Error: Unmatched closing bracket.");
+            continue;
+        }
+		// end bb
+
+        // cc Handle the keys and there value
+	
+        size_t semicolonPos = line.find(';');
+        size_t firstspace = line.find_first_of(' ');
+        if (semicolonPos != std::string::npos)
+		{
+            std::string key = trim(line.substr(0, firstspace));
+            std::string value = trim(line.substr(firstspace + 1));
+			value.pop_back(); // BUG c++ 11
+
+            if (key.empty() || value.empty()) 
+                throw runtime_error("Syntax Error: Malformed key-value pair.");
+
+			if (inLocation)
+			{
+                cur_config.location[cur_path][key] = value;
+            }
+			else if (inServer)
+			{
+                cur_config.defaults[key] = value;
+            }
+			else
+                throw runtime_error("Syntax Error: Key-value pair outside of valid block.");
+        }
 		else
-			continue;
-			// FIXME unexpacted input
+            throw runtime_error("Syntax Error: Missing ';' at the end of the line.");
+		// end cc
+    }
+
+    // Final checks for unmatched brackets
+    if (serverBracketCount != 0)
+		throw runtime_error("Syntax Error: Unmatched brackets in server block.");
+    if (locationBracketCount != 0)
+		throw runtime_error("Syntax Error: Unmatched brackets in location block.");
+
+	// Close configfile
+    configFile.close();
+
+	std::vector<Server> servers = config2server(configs);
+
+	for (int i = 0; i < servers.size(); i++)
+	{
+		servers[i].print();
 	}
 
 }
-
-std::vector<Config> Parse::get_servers(std::string file_name)
-{
-	std::ifstream conff(file_name);
-	std::string line;
-	std::string expression;
-	std::string tocken;
-    Config		servers_conf;
-    std::vector<Config> servers; 
-
-	int blok = 0;
-
-	for (;;)
+	// Catch syntax errors 
+	catch (runtime_error &e)
 	{
-		if (!std::getline(conff, line))
-			break;
-		line.push_back('\n');
-		to_line_exp(line);
-		if (std::istringstream(line) >> std::ws && !std::istringstream(line).eof())
-			expression += line;
+		cerr << "webserv config: `" << configFile.name() << "' " << e.what() << endl;
+		configFile.close();
+		std::exit(1);
 	}
 
-	std::istringstream sexp(expression);
-
-	sexp >> line;
-	if (line == "server")
-	{
-		sexp >> line;
-		if (line == "{")
-			blok++;
-		// ADD protect errors
-		sexp >> std::ws;
-		get_defaults(sexp, servers_conf);
-        servers.push_back(servers_conf);
-	}
-
-	// cout << servers_conf.defaults["listen"] << endl;
-	// cout << servers_conf.defaults["server_name"] << endl;
-	// cout << servers_conf.defaults["host"] << endl;
-	// cout << servers_conf.defaults["root"] << endl;
-	// cout << servers_conf.defaults["index"] << endl;
-	// cout << servers_conf.defaults["error_page"] << endl;
-
-	// cout << std::boolalpha << servers_conf.location["/"].root << endl;
-	// cout << std::boolalpha << servers_conf.location["/user"].allow_methods << endl;
-	// cout << std::boolalpha << servers_conf.location["/path1"].allow_methods << endl;
-
-	return (servers);
+	exit(0);
+	// return (servers);
 }

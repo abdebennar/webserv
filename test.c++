@@ -1,148 +1,162 @@
 #include <iostream>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <cstring>
-#include <sys/socket.h>
-#include <assert.h>
-#include <netinet/in.h>
-#include <cstring>
-#include <iostream>
-#include <unistd.h>
-#include <poll.h>
 #include <fstream>
+#include <sstream>
+#include <string>
+#include <map>
+#include <vector>
 
-
-const char http_response[] =
-    "HTTP/1.1 200 OK\n"
-    "Accept-Ranges: bytes\r\n"
-    "Age: 294510\r\n"
-    "Cache-Control: max-age=604800\r\n"
-    "Content-Type: text/html; charset=UTF-8\r\n"
-    "Date: Fri, 21 Jun 2024 14:18:33 GMT\r\n"
-    "Etag: \"3147526947\"\r\n"
-    "Expires: Fri, 28 Jun 2024 14:18:33 GMT\r\n"
-    "Last-Modified: Thu, 17 Oct 2019 07:18:26 GMT\r\n"
-    "Server: ECAcc (nyd/D10E)\r\n"
-    "X-Cache: HIT\r\n"
-    "Content-Length: [body-lenght] \r\n"
-    "\r\n"
-    "<!doctype html>\n"
-    "<html lang=\"en\">\n"
-    "<head>\n"
-    "    <meta charset=\"UTF-8\">\n"
-    "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
-    "    <meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">\n"
-    "    <title>Server Test - It's Working</title>\n"
-    "    <style>\n"
-    "        body {\n"
-    "            font-family: Arial, sans-serif;\n"
-    "            text-align: center;\n"
-    "            margin-top: 50px;\n"
-    "        }\n"
-    "        .message {\n"
-    "            font-size: 2em;\n"
-    "            color: #4CAF50;\n"
-    "        }\n"
-    "    </style>\n"
-    "</head>\n"
-    "<body>\n"
-    "    <div class=\"message\">It's Working!</div>\n"
-    "    <p>Congratulations, your server is up and running.</p>\n"
-    "</body>\n"
-    "</html>";
-
-// const char *response_404 = "HTTP/1.1 404 Not Found\r\n"
-// "Content-Type: text/html; charset=UTF-8\r\n"
-// "Cache-Control: no-cache, no-store, must-revalidate\r\n"
-// "Date: Fri, 21 Nov 2024 14:18:33 GMT\r\n"
-// "Expires: 0\r\n"
-// "Server: CustomServer/1.0\r\n"
-// "Content-Length: [body length]\r\n";
-
-
-int main2()
-{
-	int fd = open("response.txt", O_RDWR);
-
-	write (fd, http_response, strlen(http_response));
-	exit(0);
-
+// Utility function to trim leading and trailing whitespace
+std::string trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t");
+    size_t end = str.find_last_not_of(" \t");
+    return (start == std::string::npos) ? "" : str.substr(start, end - start + 1);
 }
 
-// Function to set up a client socket and connect to the server
-int main()
-{
-	int fd = socket(AF_INET, SOCK_STREAM, 0);
-	assert(fd >= 0 && " ERROR: can't open a socket\n");
+// Function to check if a line starts with "server" and is valid
+bool isServerStart(const std::string& line) {
+    std::string trimmed = trim(line);
+    return trimmed == "server" || trimmed == "server{" || trimmed == "server {";
+}
 
-	int flags = fcntl(fd, F_GETFL, 0);
-	fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+// Function to check if a line starts with "location" and ends with "{"
+bool isLocationStart(const std::string& line) {
+    size_t pos = line.find("location");
+    if (pos != std::string::npos) {
+        size_t openBracket = line.find("{", pos);
+        std::string path = line.substr(pos + 8, openBracket - (pos + 8));
+        path.erase(0, path.find_first_not_of(" \t"));
+        path.erase(path.find_last_not_of(" \t") + 1);
+        return !path.empty() && openBracket == line.length() - 1;
+    }
+    return false;
+}
 
-	struct sockaddr_in socketaddr;
+int main() {
+    std::ifstream configFile("test.conf"); // Replace with your file path
+    if (!configFile.is_open()) {
+        std::cerr << "Error: Unable to open config file.\n";
+        return 1;
+    }
 
-	bzero(&socketaddr, sizeof(sockaddr_in));
-	socketaddr.sin_family = AF_INET;
-	socketaddr.sin_port = htons(80);
+    std::vector<std::map<std::string, std::string> > servers;
+    std::map<std::string, std::string> currentServer;
 
-	int ret = bind(fd, (const struct sockaddr *)&socketaddr, sizeof(socketaddr));
-	if (ret < 0)
-		perror(""), errno = 0;
+    bool inServer = false;
+    bool inLocation = false;
 
+    int serverBracketCount = 0;  // Tracks `{` and `}` balance in `server` blocks
+    int locationBracketCount = 0;  // Tracks `{` and `}` balance in `location` blocks
 
-	ret = listen(fd, 8);
-	assert(ret >= 0 && " ERROR: can't listen \n");
+    std::string line;
+    while (std::getline(configFile, line)) {
+        line = trim(line);
 
-	struct sockaddr client_data = {0};
-	socklen_t client_d_len = 0;
+        // Skip empty lines and comments
+        if (line.empty() || line[0] == '#') continue;
 
-
-	std::string line;
-	char in[1024];
-
-	// flags = fcntl(cfd, F_GETFL, 0);
-	// fcntl(cfd, F_SETFL, flags | O_NONBLOCK);
-
-	
-
-	
-
-	while (true)
-	{
-		struct pollfd pfd = {0};
-		int cfd = accept(fd, &client_data, &client_d_len);
-		if (cfd > 0)
-			std::cout << "new connection" << std::endl;
-		pfd.events =  POLLIN;
-		pfd.fd = cfd;
-		if (poll(&pfd, 1, 1000) == 1)
+        // Handle start of a "server" block
+        if (isServerStart(line)) 
 		{
-			if (pfd.revents & POLLIN)
-			{
-				while (true)
-				{
-					int rr = read(cfd, &in, 1024);
-					if (rr > 0)
-					{
-						in[rr] = 0;
-						std::cout << in;
-					}
-					else
-						break;
-				}
-				int w = write(cfd, http_response, 950);
-				std::cout << http_response << std::endl;
-				std::cout << w << " of bytes writed in socket fd" << std::endl;
+            if (inServer) {
+                std::cerr << "Syntax Error: Nested server blocks are not allowed.\n";
+                return 1;
+            }
+            inServer = true;
 
-				std::cout << " Done writing !! " << std::endl;
-				close(cfd);
-				}
-		}
-		else
-			std::cout << "timeout " << std::endl;
-	}
-	}
+            // Check if `{` is present immediately
+            if (line.find("{") != std::string::npos) {
+                ++serverBracketCount;
+            } else {
+                // Expect `{` on the next line
+                std::getline(configFile, line);
+                line = trim(line);
+                if (line != "{") {
+                    std::cerr << "Syntax Error: Missing '{' after server declaration.\n";
+                    return 1;
+                }
+                ++serverBracketCount;
+            }
+            continue;
+        }
 
+        // Handle start of a "location" block
+        if (isLocationStart(line)) {
+            if (!inServer) {
+                std::cerr << "Syntax Error: Location block outside of server block.\n";
+                return 1;
+            }
+            inLocation = true;
+            ++locationBracketCount;
+            continue;
+        }
 
+        // Handle closing brackets
+        if (line == "}") {
+            if (inLocation) {
+                --locationBracketCount;
+                if (locationBracketCount == 0) {
+                    inLocation = false; // End of location block
+                }
+            } else if (inServer) {
+                --serverBracketCount;
+                if (serverBracketCount == 0) {
+                    inServer = false; // End of server block
+                    servers.push_back(currentServer); // Save completed server
+                    currentServer.clear(); // Reset for next server
+                }
+            } else {
+                std::cerr << "Syntax Error: Unmatched closing bracket.\n";
+                return 1;
+            }
+            continue;
+        }
 
+        // Handle key-value pairs
+        size_t semicolonPos = line.find(';');
+        size_t firstspace = line.find_first_of(' ');
+        if (semicolonPos != std::string::npos) {
+            std::string key = trim(line.substr(0, firstspace));
+            std::string value = trim(line.substr(firstspace + 1));
+
+            if (key.empty() || value.empty()) {
+				std::cout << key << " : " << value << std::endl;
+                std::cerr << "Syntax Error: Malformed key-value pair.\n";
+                return 1;
+            }
+
+            if (inServer) {
+                currentServer[key] = value;
+            } else if (inLocation) {
+                currentServer["location_" + key] = value; // Prefix location settings
+            } else {
+                std::cerr << "Syntax Error: Key-value pair outside of valid block.\n";
+                return 1;
+            }
+        } else {
+            std::cerr << "Syntax Error: Missing ';' at the end of the line.\n";
+            return 1;
+        }
+    }
+
+    // Final checks for unmatched brackets
+    if (serverBracketCount != 0) {
+        std::cerr << "Syntax Error: Unmatched brackets in server block.\n";
+        return 1;
+    }
+    if (locationBracketCount != 0) {
+        std::cerr << "Syntax Error: Unmatched brackets in location block.\n";
+        return 1;
+    }
+
+    configFile.close();
+
+    // Print parsed servers
+    for (size_t i = 0; i < servers.size(); ++i) {
+        std::cout << "Server " << i + 1 << ":\n";
+        for (std::map<std::string, std::string>::iterator it = servers[i].begin(); it != servers[i].end(); ++it) {
+            std::cout << "  " << it->first << ": " << it->second << "\n";
+        }
+    }
+
+    return 0;
+}

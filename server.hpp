@@ -20,6 +20,7 @@
 #include <poll.h>
 #include <fstream>
 #include "config.hpp"
+#include <cstdint>
 
 
 using std::string;
@@ -61,6 +62,18 @@ struct	loc_details
 	bool		auto_index;
 	bool		has_cgi;
 	string 		root;
+	string 		return_path;
+
+
+	 void print() const {
+        cout << "    Status Code: " << status_code << endl;
+        cout << "    Index Path: " << index_path << endl;
+        cout << "    Allow Methods: " << allow_methods << endl;
+        cout << "    Autoindex: " << (auto_index ? "true" : "false") << endl;
+        cout << "    Has CGI: " << (has_cgi ? "true" : "false") << endl;
+        cout << "    Root: " << root << endl;
+        cout << "    Return Path: " << return_path << endl;
+    }
 
 };
 
@@ -68,10 +81,40 @@ struct	loc_details
 
 class	Server
 {
-	PORT	port;
-	ip_addr	ip;
 	public :
-		Server();
-		void run();
-		~Server();
+		std::map<string, loc_details>	locations;
+		std::map<int, string>	error_pages;
+
+		uint16_t	port;
+		string	server_name;
+		in_addr_t	host;
+		string		index;
+		bool		auto_index;
+
+
+	public :
+		Server(): 
+		port(-1), server_name(""), host(0), index("") { }
+		 void print() const {
+        std::cout << "Server Name: " << server_name << std::endl;
+        std::cout << "Port: " << port << std::endl;
+        std::cout << "Host: " << host << std::endl;
+        std::cout << "Index: " << index << std::endl;
+        std::cout << "Auto Index: " << (auto_index ? "true" : "false") << std::endl;
+
+        // Print error pages
+        std::cout << "Error Pages:" << std::endl;
+        for (std::map<int, std::string>::const_iterator it = error_pages.begin(); it != error_pages.end(); ++it) {
+            std::cout << "  " << it->first << " -> " << it->second << std::endl;
+        }
+
+        // Print locations
+        std::cout << "Locations:" << std::endl;
+        for (std::map<std::string, loc_details>::const_iterator it = locations.begin(); it != locations.end(); ++it) {
+            std::cout << "  Location: " << it->first << std::endl;
+            it->second.print(); // Print details of the location
+        }
+
+        std::cout << "-----------------------------" << std::endl;
+    }
 };
