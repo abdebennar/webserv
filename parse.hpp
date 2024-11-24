@@ -42,7 +42,7 @@ enum token
 class Parse
 {
     public :
-		static std::vector<Server> &get_servers(std::string file_name);
+		static std::vector<Server> get_servers(std::string file_name);
 		static std::vector<Server> config2server(std::vector<Config> configs);
 };
 

@@ -202,7 +202,7 @@ std::string hostToString(in_addr_t host) {
     return inet_ntoa(addr);
 }
 
-std::vector<Server> &Parse::get_servers(std::string file_name)
+std::vector<Server> Parse::get_servers(std::string file_name)
 {
 	std::vector<Config> configs;
 	Config				cur_config;

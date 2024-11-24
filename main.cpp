@@ -119,39 +119,13 @@ using namespace std;
 
 int	main(/*int argc, char **argv*/)
 {
-	// try 
-	// {
-		std::vector<Config>	servers;
+		std::vector<Server>	servers;
 		std::string		filename("./test.conf");
 
 
-		Parse::get_servers(filename);
 
+		servers = Parse::get_servers(filename);
 
-		// Config	server1;
-		// Config	server2;
-		// Config	server3;
-	
-		// server1.defaults["listen"] = "9090";
-		// server2.defaults["listen"] = "9099";
-		// server3.defaults["listen"] = "8080";
-		// server1.defaults["host"] 	= "127.0.0.1";
-		// server2.defaults["host"] 	= "10.11.13.2";
-		// server3.defaults["host"] 	= "10.11.13.2";
-
-		// servers.push_back(server1);
-		// servers.push_back(server2);
-		// servers.push_back(server3);
- 
-		// servers = Parse::get_servers(filename);
-
-		// init(servers);
-		// run();
-
-		// Server::init(); // check all the servers  are valid, check ip addresses
-		// , ports , duplication , and creat sockets and bind them , open ports ...
-		// Server::run(); // TODO run  the servers , start lestning
-	// }
 
 
 }
