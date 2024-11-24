@@ -208,6 +208,7 @@ std::vector<Server> &Parse::get_servers(std::string file_name)
 	Config				cur_config;
 	wbs_ifstream configFile(file_name);
 	string		cur_path;
+	std::vector<Server> servers;
 
 	bool inServer = false;
     bool inLocation = false;
@@ -215,8 +216,7 @@ std::vector<Server> &Parse::get_servers(std::string file_name)
 	int serverBracketCount = 0; 
     int locationBracketCount = 0; 
 
-	  std::vector<std::map<std::string, std::string> > servers;
-		std::map<std::string, std::string> currentServer;
+	std::map<std::string, std::string> currentServer;
 
 try{
    		 if (!configFile.is_open())
@@ -328,7 +328,7 @@ try{
 	// Close configfile
     configFile.close();
 
-	std::vector<Server> servers = config2server(configs);
+	servers = config2server(configs);
 
 	for (int i = 0; i < servers.size(); i++)
 	{
@@ -344,6 +344,5 @@ try{
 		std::exit(1);
 	}
 
-	exit(0);
-	// return (servers);
+	return (servers);
 }

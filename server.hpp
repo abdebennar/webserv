@@ -93,8 +93,31 @@ class	Server
 
 
 	public :
-		Server(): 
+		Server():
 		port(-1), server_name(""), host(0), index("") { }
+
+		Server& operator= (const Server &cpy)
+		{
+			if (this != &cpy)
+			{
+			
+				port = cpy.port;
+				server_name = cpy.server_name;
+				host = cpy.host;
+				index = cpy.index;
+				auto_index = cpy.auto_index;
+
+				locations = cpy.locations;
+				error_pages = cpy.error_pages;
+			}
+			return *this;
+		}
+
+		Server(const Server &cpy)
+		{
+			*this = cpy; 
+		}
+
 		 void print() const {
         std::cout << "Server Name: " << server_name << std::endl;
         std::cout << "Port: " << port << std::endl;
