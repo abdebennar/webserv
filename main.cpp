@@ -126,6 +126,11 @@ int	main(/*int argc, char **argv*/)
 
 		servers = Parse::get_servers(filename);
 
+		for (int i = 0; i < servers.size(); i++)
+		{
+			servers[i].index = i;
+			servers[i].setup();
+		}
 
-
+		Server::run(servers);
 }

@@ -121,7 +121,7 @@ const char http_response[] =
     "    </style>\n"
     "</head>\n"
     "<body>\n"
-    "    <div class=\"message\">Nta Zamel!</div>\n"
+    "    <div class=\"message\"> Server is Runing!</div>\n"
     "</body>\n"
     "</html>";
 
@@ -143,8 +143,6 @@ class	Config
 {
     
 	public :
-		// static struct pollfd 			fds[1000];
-		static int													numfds;
         std::map<string, string>										defaults;
 		std::map< string, std::map<string, string> >					location;
 		// struct sockaddr_in 				address;

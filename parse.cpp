@@ -329,12 +329,6 @@ try{
     configFile.close();
 
 	servers = config2server(configs);
-
-	for (int i = 0; i < servers.size(); i++)
-	{
-		servers[i].print();
-	}
-
 }
 	// Catch syntax errors 
 	catch (runtime_error &e)

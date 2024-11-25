@@ -21,6 +21,7 @@
 #include <fstream>
 #include "config.hpp"
 #include <cstdint>
+#include "pollfd.hpp"
 
 
 using std::string;
@@ -82,19 +83,27 @@ struct	loc_details
 class	Server
 {
 	public :
+		int 					server_index;
+		static	Pollfd			pool;
 		std::map<string, loc_details>	locations;
-		std::map<int, string>	error_pages;
+		std::map<int, string>			error_pages;
 
 		uint16_t	port;
-		string	server_name;
+		string		server_name;
 		in_addr_t	host;
 		string		index;
 		bool		auto_index;
-
+		int 		socket_fd;
+		struct sockaddr_in	address;
 
 	public :
 		Server():
 		port(-1), server_name(""), host(0), index("") { }
+
+		// void	run(std::vector<Server> &servers)
+		void	setup();
+		static void	run(std::vector<Server> &servers);
+		void	accept_connections();
 
 		Server& operator= (const Server &cpy)
 		{
@@ -141,3 +150,4 @@ class	Server
         std::cout << "-----------------------------" << std::endl;
     }
 };
+
