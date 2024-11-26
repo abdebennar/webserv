@@ -45,7 +45,7 @@ void	Server::accept_connections()
 		// 	cout << "new connections" << endl;
 		// }
 			char buffer[8192] = {0};
-			int valread = read(fd, buffer, 8192);
+			int valread = read(fd, buffer, 8192); // BUG will not read the full request , mabe add while
 
 			if (valread == 0)
 			{
@@ -56,7 +56,7 @@ void	Server::accept_connections()
 			{
 				cout << buffer << endl;
 				send(fd, (void*)http_response, sizeof(http_response), 0);
-				Server::pool.remove(fd);
+				// Server::pool.remove(fd); // POS here where should check if the client asked for disconecting to do so
 				cout << "data sended" << endl;
 			}
 	// 	}
@@ -109,6 +109,17 @@ void	Server::setup()
 		Server::pool.add(this->socket_fd, socket_fd);
 }
 
+/**
+ * @brief How servers should work :
+ * 	first monitor all fd's of servers
+ *  when i got POLLIN means there is a new connection or client  sended a request 
+ *  if new connection accept them
+ *  else if clients sended a req parse it and change the fd of client to POLLOUT so event when he ready to read
+ *  store the response until he is ready ...
+ * 
+ * @param servers 
+ */
+
 void	Server::run(std::vector<Server> &servers)
 {
 	cout << "num of fds :" << Server::pool.size() << endl;
@@ -136,6 +147,7 @@ void	Server::run(std::vector<Server> &servers)
 				else
 					serve(fds[i].fd, servers);
 			}
+			// else check response
 		}
 	}
 }

@@ -121,7 +121,7 @@ const char http_response[] =
     "    </style>\n"
     "</head>\n"
     "<body>\n"
-    "    <div class=\"message\"> Server is Runing!</div>\n"
+    "    <div class=\"message\"> Nta Zamel!</div>\n"
     "</body>\n"
     "</html>";
 
