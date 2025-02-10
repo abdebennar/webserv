@@ -9,12 +9,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-    	- name: Compile program
+      - name: Compile program
+        run: make all
+
+      - name: Run on localhost
         run: |
-          make all
-			- name: Run on localhost
-				run:
-					./webserv
-			- name:
-				run:
-					curl -s http://127.0.0.1:8080
+          ./webserv &  # Run in background
+          sleep 2      # Wait for server to start
+
+      - name: Curl Test
+        run: |
+          curl -s --fail http://127.0.0.1:8080 || (echo "Server not responding" && exit 1)
