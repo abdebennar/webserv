@@ -9,8 +9,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Compile program
+    	- name: Compile program
         run: |
           make all
-
-
+			- name: Run on localhost
+				run:
+					./webserv
+			- name:
+				run:
+					curl -s http://127.0.0.1:8080
