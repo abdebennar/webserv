@@ -1,9 +1,9 @@
-name: Compiling Test
+name: Compiling and Testing
 
 on: [push]
 
 jobs:
-  test:
+  compile_and_run:
     runs-on: macos-latest
     steps:
       - name: Checkout code
@@ -14,9 +14,25 @@ jobs:
 
       - name: Run on localhost
         run: |
-          ./webserv &  # Run in background
-          sleep 2      # Wait for server to start
+          ./webserv &
+          sleep 2
 
       - name: Curl Test
         run: |
           curl -s --fail http://127.0.0.1:8080 || (echo "Server not responding" && exit 1)
+    
+  test:
+    runs-on: macos-latest
+    needs: compile_and_run   # Ensures the test job runs after the compilation job
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Init Tests
+        run: bash init_test.sh
+
+      - name: Server Test 
+        run: python3 server_test.py
+
+      - name: Locations Test
+        run: python3 locations_test.py

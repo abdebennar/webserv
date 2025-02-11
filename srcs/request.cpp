@@ -4,9 +4,6 @@
 #include "utils.hpp"
 
 
-//TODO 127.0.0.1:8080 -> 501 why
-//file.html/ab works why
-
 request::request(std::string raw_req, vector<Server> &p_servers, int port) : req(raw_req), servers(p_servers)
 {
 	cl_entry_port = port;
@@ -34,6 +31,7 @@ string fix_slash(string base, string file)
     {
         if (!file.empty() && file[0] != '/')
             base.append(1, '/');
+            //TODO do a cpp11 check
     }
     return (base + file);
 }
@@ -94,12 +92,11 @@ bool    request::is_valid_URI()
         size_t find_slash = URI.find("/", find_dot);
         if (find_slash == string::npos)
             return (true);
+        
+       this->extension =  URI.substr(find_dot + 1, find_slash - find_dot - 1);
 
         this->PATH_INFO = URI.substr(find_slash); // INFO i changed this so path with a slash
         this->PATH_INFO_URI = URI.substr(0, find_slash);
-
-        pp "PATH INFO-> " <<  this->PATH_INFO << endl;
-        // pp "QUERY-> " <<  this->query << endl;
     }
     return (true);
 }
@@ -127,6 +124,7 @@ int request::is_req_well_formed() //REQ
     //LINE 1
     std::string l1_s, tmp_line, field, value;
 
+    // pp YELLOW << req << RESET << endl;
     if (req.empty())
         return (err_("EMPTY"), 400);
     std::stringstream ss(req);
@@ -166,7 +164,7 @@ int request::is_req_well_formed() //REQ
         if (value.empty())
             continue;
         
-        this->headers.insert(std::make_pair(field, wbs::get_trimed(value)));
+        this->headers.insert(std::make_pair(field, value));
     }
     if (headers.find("Host") == headers.end())
         return (err_("NO HOST FOUND"), 400);
@@ -174,8 +172,6 @@ int request::is_req_well_formed() //REQ
     this->host = headers["Host"];
 
     
-
-
     if (req.size() > head_end + 4)
     {
         this->body = req.substr(head_end + 4);
@@ -196,10 +192,17 @@ int request::is_req_well_formed() //REQ
     return (0);
 }
 
-bool is_file_exist(const string &file)
+int is_file_dir(const string &file)
 {
     struct stat buffer;
-    return (stat(file.c_str(), &buffer) == 0);
+    if (stat(file.c_str(), &buffer) == 0)
+    {
+        if (buffer.st_mode & S_IFDIR)
+            return (1); //dir
+        else if (buffer.st_mode & S_IFREG)
+            return (2); //file
+    }
+    return (0);
 }
 
 bool request::get_matched_loc_for_req_uri() //REQ
@@ -222,7 +225,7 @@ bool request::get_matched_loc_for_req_uri() //REQ
     {
         if (tmp_size < it->size())
         {
-            if (is_file_exist(locations[*it].root + "/" + URI.substr(it->size()))
+            if (is_file_dir(locations[*it].root + "/" + URI.substr(it->size()))
                 || URI.find(fix_slash(*it, "/")) == 0)
             {
                 tmp_size = it->size();
@@ -247,32 +250,52 @@ bool request::is_method_allowed_in_loc() //REQ
     return (std::find(met.begin(), met.end(), this->method) != met.end());
 }
 
-int request::get_request_resource() //get_resource_type()
+void request::set_resource_path()
 {
     if (correct_loc_name != "default")
-    {
         this->resource_path = fix_slash(current_loc.root, this->URI.substr(correct_loc_name.size(), URI.size() - correct_loc_name.size()));
-    }
     else
         this->resource_path = fix_slash(current_loc.root, this->URI);
+}
+
+int request::get_request_resource() //get_resource_type()
+{
+    set_resource_path();
     struct stat s;
     if (!stat(this->resource_path.c_str(), &s))
     {
         if (S_ISDIR(s.st_mode))
+        {
+            if (access(this->resource_path.c_str(), R_OK | X_OK)) //exec so i can access the dir
+                return (err_("Read/Exec access"), -11);
             return (1);
+        }
         else if (S_ISREG(s.st_mode))
+        {
+            if (access(this->resource_path.c_str(), R_OK))
+                return (err_("Read access"), -22);
             return (2);
+        }
         else
             return (err_("get_request_resource"), -1);
     }
     else
     {
-        pp "ROOT -> " << current_loc.root << endl;
         if (!this->PATH_INFO.empty() && current_loc.has_cgi && !PATH_first)
         {
             this->URI = this->PATH_INFO_URI;
-            PATH_first = true;
-            return (get_request_resource());
+            set_resource_path();
+            if (is_file_dir(this->resource_path) != 2)
+                return (err_("PATH_INFO + dir " + this->resource_path), 0);
+            for (std::vector<std::string>::iterator it = current_loc.cgi_extentions.begin(); it != current_loc.cgi_extentions.end(); ++it)
+            {
+                if (this->extension == *it)
+                {
+                    PATH_first = true;
+                    return (get_request_resource());
+                }
+            }
+            return (err_("PATH_INFO + invalid extension"), 0);
         }
         return (err_("Resource not found " + resource_path), 0);
     }
@@ -329,6 +352,8 @@ int     request::GET()
         this->URI += "/" + this->PATH_INFO;
 
     resource_type = get_request_resource();
+    if (resource_type < -10)
+        return (403);
     if (resource_type <= 0)
         return (404);
     if (resource_type == 1) // dir
@@ -359,6 +384,8 @@ int     request::POST()
         return (if_loc_support_upload());
 
     resource_type = get_request_resource();
+    if (resource_type < -10)
+        return (403);
     if (resource_type <= 0)
         return (404);
     if (resource_type == 1) // dir
@@ -385,6 +412,8 @@ int     request::POST()
 int     request::DELETE()
 {
     resource_type = get_request_resource();
+    if (resource_type < -10)
+        return (403);
     if (resource_type <= 0)
         return (404);
     if (resource_type == 1) // dir
@@ -426,6 +455,8 @@ bool    request::set_locations()
         ||  (servers[i]._server_info.remote_addr == this->host && servers[i].port == 80))
         {
             this->locations = servers[i].get_locations();
+            this->server_info = servers[i]._server_info;
+            this->server_info.server_name = servers[i]._server_info.remote_addr;
 			return (servers[i].port == (uint32_t)cl_entry_port);
         }
 		for (size_t j = 0; j < servers[i].server_names.size(); ++j)
@@ -434,6 +465,8 @@ bool    request::set_locations()
 			||  servers[i].server_names[j] == servers[i]._server_info.remote_addr)
 			{
 				this->locations = servers[i].get_locations();
+                this->server_info.server_name = servers[i].server_names[j];
+                this->server_info = servers[i]._server_info;
 				return (servers[i].port == (uint32_t)cl_entry_port);
 			}
 		}

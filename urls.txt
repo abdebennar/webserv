@@ -2,9 +2,6 @@
 
 
 
-http://127.0.0.1:8080/Upload.html
-http://127.0.0.1:8080/delete_test.html
-http://127.0.0.1:8080/landing.html
 
 
 

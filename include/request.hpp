@@ -12,6 +12,7 @@ class request
         std::fstream outfile;
         string HTTP;
         string req;
+        string extension;
         size_t uploaded_size;
         size_t length;
         string host;
@@ -22,6 +23,7 @@ class request
         std::map<string, string> headers;
         std::map<string, loc_details> locations;
         loc_details current_loc;
+		server_info server_info;
 
         string resource_path;
         string PATH_INFO_URI;
@@ -42,6 +44,7 @@ class request
         request(std::string raw_req, vector<Server> &server, int client_fd);
         virtual ~request();
         void    display_req();
+        void    set_resource_path();
         bool    valid_method();
         bool    set_locations();
         bool    valid_elem(std::string elem);
@@ -53,7 +56,6 @@ class request
         int     init_parse_req();
         bool    is_uri_has_slash_in_end();
         bool    is_dir_has_index_path();
-        bool    prepare_index_path();
         bool    if_location_has_cgi();
         int     req_arch();
         bool    is_valid_URI();

@@ -152,7 +152,8 @@ void response::set_server()
 
 void response::set_cookies()
 {
-    _cookies = headers["Cookie"];
+    if (this->headers.find("Cookie") != this->headers.end())
+        _cookies = headers["Cookie"];
 }
 
 void response::set_connection()
@@ -166,6 +167,7 @@ void response::set_connection()
 
 void response::set_content_type()
 {
+    pp "-> " << _content_type << endl;
     if (this->stat_code / 400)
     {
         this->_content_type = "text/html";
@@ -222,7 +224,9 @@ void response::set_content_type()
     size_t dot_p = this->URI.find_last_of('.');
     if (dot_p == std::string::npos || this->stat_code != 200)
         return ;
+    pp "-> " << _content_type << endl;
 
+    //TODO content0-type on html does not work well
     std::string ext = this->URI.substr(dot_p + 1);
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
     std::map<std::string, std::string>::iterator it = mime.find(ext);
@@ -251,10 +255,11 @@ bool response::prepare_autoindex()
     DIR *dirp = opendir(dir.c_str());
 
     if (!dirp)
-        return (perror("opendir failed"), false);
+        return (err_("opendir failed on prepare_autoindex()"), false);
     
     std::stringstream raw_body;
-    raw_body    << "<title>Directory listing for "<< dir
+    raw_body    << "<meta http-equiv='Content-Type' content='text/html; charset=utf-8' />"
+                << "<title>Directory listing for "<< dir
                 << "</title>\n<body>\n<h2>Directory listing for "
                 << dir << "</h2>\n<hr>\n<ul>\r";
     std::string current;
@@ -265,14 +270,15 @@ bool response::prepare_autoindex()
         current = dp->d_name;
         if ((current == ".") || (current == ".."))
             continue;
-        current = dir + dp->d_name;
+        current = dir + "/" + dp->d_name;
         if (stat(current.c_str(), &s) < 0)
-            return (closedir(dirp), perror(NULL), false);
+            return (closedir(dirp), err_("stat < 0 on prepare_auto_index()"), false);
 
         if (S_ISDIR(s.st_mode))
-            raw_body << "<li><a href=\"" << dp->d_name << "/\">" << dp->d_name << "</a>" << std::endl;
+            raw_body << "<li><a href=\"" << dp->d_name << "/\">" << "📁 " << dp->d_name << "</a>" << std::endl;
+
         else if (S_ISREG(s.st_mode))
-            raw_body << "<li><a href=\"" << dp->d_name << "\">" << dp->d_name << "</a>" << std::endl;
+            raw_body << "<li><a href=\"" << dp->d_name << "\">" << "📄 " << dp->d_name << "</a>" << std::endl;
     }
     raw_body << "</ul>\n<hr>\n</body>\n</html>\n";
     _body = raw_body.str();
@@ -361,7 +367,9 @@ void response::_20X()
             if (is_dir_has_index_path())
                 prep_body(this->resource_path);
             else if (get_auto_index() && !prepare_autoindex())
-		        throw_err_body("");
+            {
+		        throw_err_body("prepare_autoindex() failed");
+            }
         }
         else if (resource_type == 2)
             prep_body(this->resource_path);
@@ -534,7 +542,7 @@ std::map<std::string, std::string>    response::prepare_env_cgi()
 {
     std::map<std::string, std::string> environ_vars;
     environ_vars["REQUEST_METHOD"] = this->method;
-    environ_vars["SERVER_NAME"] = this->_server_info.server_name;
+    environ_vars["SERVER_NAME"] = this->server_info.server_name;
     environ_vars["SCRIPT_NAME"] = this->URI ;
     environ_vars["CONTENT_TYPE"] = this->_content_type;
 
@@ -543,14 +551,14 @@ std::map<std::string, std::string>    response::prepare_env_cgi()
     environ_vars["SCRIPT_FILENAME"] = this->resource_path;
     environ_vars["HTTP_USER_AGENT"] = this->headers["User-Agent"];
     environ_vars["HTTP_COOKIE"] = this->_cookies;
-    environ_vars["SERVER_PORT"] = this->_server_info.server_port;
+    environ_vars["SERVER_PORT"] = this->server_info.server_port;
 	environ_vars["GATEWAY_INTERFACE"] = "CGI/1337";
 	environ_vars["SERVER_SOFTWARE"] = "42 webserv (Unix)";
 	environ_vars["SERVER_PROTOCOL"] =  "HTTP/1.1";
-	environ_vars["REMOTE_ADDR"] = this->_server_info.remote_addr;
-	environ_vars["REMOTE_HOST"] = this->_server_info.server_name;
+	environ_vars["REMOTE_ADDR"] = this->server_info.remote_addr;
     environ_vars["QUERY_STRING"] = this->query;
     environ_vars["PATH_INFO"] = this->PATH_INFO;
+    //TODO srv port/name are empty
 
     return (environ_vars);
 }
@@ -565,6 +573,7 @@ response::response(std::string req, vector<Server> &servers, int p_cfd) : reques
 	// this->_server_info = info;
     buffer = new char[RW_BUFFER];
     set_connection();
+    set_cookies();
     set_server();
     set_location();
     set_body();
